@@ -2,11 +2,7 @@
 <html>
 <head>
   <title>Jeu .io Simple</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; background: #f0f0f0; }
-    #score { position: absolute; top: 10px; left: 10px; font-family: Arial; font-size: 20px; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="score">Score: 0</div>
@@ -20,8 +16,11 @@
     const scoreElement = document.getElementById('score');
     
     // Ajuster la taille du canvas
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
     
     // Variables du jeu
     let playerId;
@@ -41,9 +40,16 @@
       mapSize = data.mapSize;
       
       // Centrer la caméra sur le joueur
-      camera.x = players[playerId].x - canvas.width / 2;
-      camera.y = players[playerId].y - canvas.height / 2;
+      updateCamera();
     });
+    
+    // Mettre à jour la position de la caméra
+    function updateCamera() {
+      if (players[playerId]) {
+        camera.x = players[playerId].x - canvas.width / 2;
+        camera.y = players[playerId].y - canvas.height / 2;
+      }
+    }
     
     // Gérer les nouveaux joueurs
     socket.on('newPlayer', (playerData) => {
@@ -77,61 +83,59 @@
     // Gérer les entrées clavier
     const keys = {};
     window.addEventListener('keydown', (e) => {
-      keys[e.key] = true;
-      
-      // Envoyer la direction au serveur
-      if (e.key === 'ArrowUp') socket.emit('move', { direction: 'up' });
-      if (e.key === 'ArrowDown') socket.emit('move', { direction: 'down' });
-      if (e.key === 'ArrowLeft') socket.emit('move', { direction: 'left' });
-      if (e.key === 'ArrowRight') socket.emit('move', { direction: 'right' });
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        socket.emit('move', { direction: e.key.replace('Arrow', '').toLowerCase() });
+      }
     });
     
-    window.addEventListener('keyup', (e) => {
-      keys[e.key] = false;
-    });
+    // Dessiner un cercle avec ombre
+    function drawCircle(x, y, radius, color) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Réinitialiser l'ombre
+      ctx.shadowColor = 'transparent';
+    }
     
     // Boucle de rendu
     function render() {
       // Effacer le canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Mettre à jour la caméra pour suivre le joueur
-      if (players[playerId]) {
-        camera.x = players[playerId].x - canvas.width / 2;
-        camera.y = players[playerId].y - canvas.height / 2;
-      }
+      // Mettre à jour la caméra
+      updateCamera();
       
       // Dessiner les items
       for (const id in items) {
         const item = items[id];
-        ctx.fillStyle = item.color;
-        ctx.beginPath();
-        ctx.arc(
+        drawCircle(
           item.x - camera.x,
           item.y - camera.y,
           10,
-          0,
-          Math.PI * 2
+          item.color
         );
-        ctx.fill();
       }
       
       // Dessiner les joueurs
       for (const id in players) {
         const player = players[id];
-        ctx.fillStyle = player.color;
-        ctx.beginPath();
-        ctx.arc(
+        drawCircle(
           player.x - camera.x,
           player.y - camera.y,
           player.radius,
-          0,
-          Math.PI * 2
+          player.color
         );
-        ctx.fill();
         
         // Afficher le score
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#fff';
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(
@@ -148,8 +152,8 @@
     
     // Redimensionnement de la fenêtre
     window.addEventListener('resize', () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      resizeCanvas();
+      updateCamera();
     });
   </script>
 </body>
