@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Jeu .io Simple</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #f0f0f0; }
+    #score { position: absolute; top: 10px; left: 10px; font-family: Arial; font-size: 20px; }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas"></canvas>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Configuration du canvas
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    
+    // Ajuster la taille du canvas
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // Variables du jeu
+    let playerId;
+    let players = {};
+    let items = {};
+    let mapSize = 2000;
+    let camera = { x: 0, y: 0 };
+    
+    // Connexion au serveur
+    const socket = io();
+    
+    // Recevoir les données initiales
+    socket.on('init', (data) => {
+      playerId = data.playerId;
+      players = data.players;
+      items = data.items;
+      mapSize = data.mapSize;
+      
+      // Centrer la caméra sur le joueur
+      camera.x = players[playerId].x - canvas.width / 2;
+      camera.y = players[playerId].y - canvas.height / 2;
+    });
+    
+    // Gérer les nouveaux joueurs
+    socket.on('newPlayer', (playerData) => {
+      players[playerData.id] = playerData;
+    });
+    
+    // Gérer les mouvements des joueurs
+    socket.on('playerMoved', (data) => {
+      if (players[data.playerId]) {
+        players[data.playerId].x = data.x;
+        players[data.playerId].y = data.y;
+      }
+    });
+    
+    // Gérer la collecte d'items
+    socket.on('itemCollected', (data) => {
+      if (data.playerId === playerId) {
+        scoreElement.textContent = `Score: ${data.playerScore}`;
+      }
+      players[data.playerId].score = data.playerScore;
+      players[data.playerId].radius = data.playerRadius;
+      delete items[data.itemId];
+      items[data.itemId] = data.newItem;
+    });
+    
+    // Gérer les déconnexions
+    socket.on('playerDisconnected', (id) => {
+      delete players[id];
+    });
+    
+    // Gérer les entrées clavier
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      
+      // Envoyer la direction au serveur
+      if (e.key === 'ArrowUp') socket.emit('move', { direction: 'up' });
+      if (e.key === 'ArrowDown') socket.emit('move', { direction: 'down' });
+      if (e.key === 'ArrowLeft') socket.emit('move', { direction: 'left' });
+      if (e.key === 'ArrowRight') socket.emit('move', { direction: 'right' });
+    });
+    
+    window.addEventListener('keyup', (e) => {
+      keys[e.key] = false;
+    });
+    
+    // Boucle de rendu
+    function render() {
+      // Effacer le canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Mettre à jour la caméra pour suivre le joueur
+      if (players[playerId]) {
+        camera.x = players[playerId].x - canvas.width / 2;
+        camera.y = players[playerId].y - canvas.height / 2;
+      }
+      
+      // Dessiner les items
+      for (const id in items) {
+        const item = items[id];
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(
+          item.x - camera.x,
+          item.y - camera.y,
+          10,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+      
+      // Dessiner les joueurs
+      for (const id in players) {
+        const player = players[id];
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.arc(
+          player.x - camera.x,
+          player.y - camera.y,
+          player.radius,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Afficher le score
+        ctx.fillStyle = '#000';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          player.score.toString(),
+          player.x - camera.x,
+          player.y - camera.y + 5
+        );
+      }
+      
+      requestAnimationFrame(render);
+    }
+    
+    render();
+    
+    // Redimensionnement de la fenêtre
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+  </script>
+</body>
+</html>
