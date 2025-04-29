@@ -1,6 +1,7 @@
 const express = require('express');
 const socketio = require('socket.io');
 const http = require('http');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,7 +23,7 @@ function generateItems() {
     items[i] = {
       x: Math.floor(Math.random() * MAP_SIZE),
       y: Math.floor(Math.random() * MAP_SIZE),
-      color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
+      color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`
     };
   }
 }
@@ -30,14 +31,23 @@ function generateItems() {
 // Démarrer le jeu
 generateItems();
 
+// Servir les fichiers statiques
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Route pour la page d'accueil
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 io.on('connection', (socket) => {
   console.log('Nouveau joueur connecté:', socket.id);
   
   // Créer un nouveau joueur
   players[socket.id] = {
+    id: socket.id,
     x: Math.floor(Math.random() * MAP_SIZE),
     y: Math.floor(Math.random() * MAP_SIZE),
-    color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+    color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
     score: 0,
     radius: 20
   };
@@ -85,7 +95,7 @@ io.on('connection', (socket) => {
         items[itemId] = {
           x: Math.floor(Math.random() * MAP_SIZE),
           y: Math.floor(Math.random() * MAP_SIZE),
-          color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
+          color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`
         };
         
         // Envoyer les mises à jour à tous les joueurs
@@ -116,5 +126,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Serveur en écoute sur le port ${PORT}`);
+  console.log(`Serveur en écoute sur http://localhost:${PORT}`);
 });
